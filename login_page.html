@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+
+
+
+
+
+
+
+
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>CAS &#8211; Central Authentication Service</title>
+
+    <meta name="_csrf" content=""/>
+    <meta name="_csrf_header" content=""/>
+
+
+    
+    <link rel="stylesheet" href="/cas/css/cas.css" />
+    <link rel="icon" href="/cas/favicon.ico" type="image/x-icon" />
+
+</head>
+<body id="cas">
+
+<div id="container">
+  <header>
+    <a id="logo" href="http://www.apereo.org" title="go to Apereo home page">Apereo</a>
+    <h1>Central Authentication Service (CAS)</h1>
+  </header>
+  <div id="content">
+
+
+
+
+<div id="cookiesDisabled" class="errors" style="display:none;">
+    <h2>Browser cookies disabled</h2>
+    <p>Your browser does not accept cookies. Single Sign On WILL NOT WORK.</p>
+</div>
+
+
+
+    
+    
+    
+
+    
+        
+        
+    
+
+    <div id="serviceui" class="serviceinfo">
+        <table>
+            <tr>
+                <td><img src="images/webapp.png"></td>
+                <td id="servicedesc">
+                    <h1>HTTPS and IMAPS</h1>
+                    <p></p>
+                </td>
+            </tr>
+        </table>
+    </div>
+    <p/>
+
+
+<div class="box" id="login">
+    <form id="fm1" action="/cas/login?service=https://spot.upi.edu/beranda" method="post">
+
+        
+
+        <h2>Enter your Username and Password</h2>
+
+        <section class="row">
+            <label for="username"><span class="accesskey">U</span>sername:</label>
+            
+                
+                
+                    
+                    <input id="username" name="username" class="required" tabindex="1" accesskey="u" type="text" value="" size="25" autocomplete="off"/>
+                
+            
+        </section>
+
+        <section class="row">
+            <label for="password"><span class="accesskey">P</span>assword:</label>
+                
+            
+            <input id="password" name="password" class="required" tabindex="2" accesskey="p" type="password" value="" size="25" autocomplete="off"/>
+            <span id="capslock-on" style="display:none;"><p><img src="images/warning.png" valign="top"> CAPSLOCK key is turned on!</p></span>
+        </section>
+
+        <!--
+        <section class="row check">
+            <p>
+                <input id="warn" name="warn" value="true" tabindex="3" accesskey="w" type="checkbox" />
+                <label for="warn"><span class="accesskey">W</span>arn me before logging me into other sites.</label>
+                <br/>
+                <input id="publicWorkstation" name="publicWorkstation" value="false" tabindex="4" type="checkbox" />
+                <label for="publicWorkstation">I am at a public workstation.</label>
+                <br/>
+                <input type="checkbox" name="rememberMe" id="rememberMe" value="true" tabindex="5"  />
+                <label for="rememberMe">Remember Me</label>
+            </p>
+        </section>
+        -->
+
+        <section class="row btn-row">
+           
+            <input type="hidden" name="execution" value="1ac44b09-dd0f-4c5f-82a2-750f8610104d_ZXlKaGJHY2lPaUpJVXpVeE1pSjkuZGxaRlVXcE1TRlpPUjNwYU9GVlhhbWhWV1hwMmFpc3pXRFkxWkVoS1J6bHFUMUptV2tWamFVTTBaR1ZCVDJ3d00xVjVSVU5zU21jd1IzWmpUMHhOTTNKMGIyUmhNVWc1VEV4a01uWnBVa293SzI1SE9TdEZUWE5hWTNSVmJYbzFNRWM0UVRoM05FNTFOSFJZYVM5RE5VRk1Sakp0UjJodWExWnJUVnA2T1Uxd2R6UnpXbWxGVUVaWlFsZENibFJGU0VsT2JWcHhkbFJWUVM5aE4yMUZUbVpwVDBWa1QyeFlPVmRNY1U1eFUzUmlSWFJXU21vMlZ6aENjVEZGUkRBeFprVlhlREJIYzNGU2FHYzNLMFZ1ZW1ZM2NHdzNRbUozVG1GR1lYSXdaa3R1VFhoWk1rMW5XRXR0VjJ0RVMwdFViM1ZwWVZSWlRWQkZVWEpEYmxVd2IydHBNelJVVkVoR2Ftb3dXbWt4YWpOVVlYUjZiVlJDTW10SFYxZDJRVEl6TTNOSWRGbHFaVXh2T0ZwSVdFeE1OVzgwUzFwTVVtRlpNa1JPUTJSaFluaG9SRmh4T0hKRVExaGpVR3BGUmtwTk5EbDJWbE12THpCMk5VazBMMWxtZDJVNFUzcFJUMFZOYmpKblVIcEJWak5qWkRWMlZtcEdhRnBzTDNkQmNFTTVlVVE1WVZsWFZDOVRTMEpDY0U5V2IxQmhjVmRCVEVRMksyVmpSVmhOYzBSWlMyUjJlalJrUjBrMmJHOVZTbm80YTBaWVVVeHBiR2w0V2xkS01ucEJUV2RRTlVkMmNFSkRUVU5EYlVkWmVsaEZia2h5YUVKbGFtVktUMVl2Tm5SVUsyMVhZMDl3VG5aSkszbFJZM1ZzVVZoSVQxRjBaRWxCZW1OS1QzcGlkWGM1ZUhZM00yTnRNRFU1VjFka1ZIQlJLMFZ1Vm5semVtaFRWVWMxUjFvNWRVTnZRMUptUWxRNFNqZHRTVUZYUzJrMGMzZG1ValJXSzFWMWMyZElSVXhuVTFCcEwzWjBlVEUwTjJrNU5XdHFTV2RtWlhkVlZrNDJiVWR2U0ZSRmJVSXZLM0kwWmpOd2JrSlBlblpSTjBaR1IyNDRVakY1VHpVclVYZFhPSFoxV2taWU1qUmxTMFE1V2tzMVVISkpjMjVxTmpCM1lWcGpWR3RrYmxwSE1teEtjVUp6WTNGd1dTOUhNQzh3Y25CYVEyUkxSRlVyVkdsSlJreHNRazlGTVZsbVJUQnVNMDUwUlU5cVppOUdRV0ZPTWtjeVMzTlhkV3hpZFU1UmIwdFhjSE4zWm1KdVdFbEZjME00Wm5FeVVETkZSekI0VVdaMk9UQnJXSFZHUzFWT2MxWjRSRGRGYkM5UVNURnJhRWRIYVVWVGJDdHlkRzkxUkVnM2NWRklhR2d3VUdOTGNDOWpaVmhrZG1reVFuSkRlR1p0VUdaQ1RIYzNWMEZsV0U4eFdWcElhRU55Tm5oNEsybE9iMjluVlhoNE1GUTFSamh3TDNwaU5UZEhSVEJsWlRkVWVWVmtNakI1ZEU1d1JtdFhlRXRHZFVnM01XWjFXVFpGVTFaWFNFVnNUa1JRU1hNek5YWkROMFJyV2k5UGJ6Z3dWU3RXZVdnNVJYRmpTbnBDU0VwT1FXTXdZa1l4T1M5VVQzQkRXSGgxTjNjMGFXNXZWRWhTTXpKMVFWZHpiMk5xUTNSMldIbzVURWRRVnpKTlNUUTJjMGc0U0RsQ1RWRlFPRWw2V1djME56UkNSME5GYVZCQ2FEbFZjWEo2YjFRMVVreDNiVkZpTUVWeVVIaE9ZbFpZY1daR2VqUnVjRGRzYzNGeFpIVkJVRmRCWjJGSFowRnRTVVY1WWxJdlJVWnZVMFpuU21GRldsUndSRTE0UlhoSFVGUjVXWEZtTm5ONE4yaGpNWEZzY1c0NFdXZzNOMDl3UW14RGRsRklSVUpVY25rMVVESjRWbWhKSzFabFRuSlNRa3hWT1RndlIwaE5WMWhRVlNzMVUzSnFhM0JyZFhabFFrTm1OeXRyTkdOWE9VUjZjbTlLT0hkVmVqVm9VbXN5U1d0MFpVMVRMekJTVUdSWFRUWmlja1V3Y2pSUk9XSktjMGd6S3pOTGRrVkJhVGx4U21wRVRHeFhOamh5YzB0eVdYUk9Sa3czTWxOd1FWcFpWSFZTVnpGSGRETnFaMDAwY25SeFVtdDFPSEJyUW1ObWRHNVJWRFpETTNscWNUTmFjbmR4YVdOTmJWSjVXSEpvVTFKamMyTXlNVVYwZHl0RFJuTkpOV0ZYUTBwQlVtRldkMHhhVTFWYU9VdG1SMW80U2sxcE1VSkRVREJxVEVsTldYRmtZM05zSzJOVWFFRTRVVEJUYlZCcllWQk9aMHgzTlROU2JYUmhhRkZPZFZabFVrUlNkWFUwV0ZaR1UyWmtXSFZZVVhGVmEwSlNUVFZvVHpWWmJVZG9XbE5QVEZOR2JIaHNTV2hYVW5aTVdFWk1RV3RzVUdFcmJuUnhXVFV6UXpsa1ZXWnFiVkJrZFhFMFFrVlphRFZXWVZOVWQxUTRhRTlLYTBkeE1HOHhMMk5OUkN0NmNWaDRjazFJWTFKc2EycE9OWE5RT0cxc2FEZzJVSFJHVG5GbU1YcGxiSGRhVGpkUGFrUTJlR0psUm0xWFEyOTBjMUprVFhkU0szcFFlak5JTmtJNGJXUnhNbFpDUWpobldHcDJVMk54YW1SYWQzSkVka3QyTXpaWVlUTlhMM0ZZVTJKc1lqUmhkVlJ2WmpCRmFrdEVZazgzUkU5c1lreDVSV2QwT1ZwRk4wWjFlazV0VTFKYVNWSTJUVzVGVXpjMU9GTTRTR0YwWWxFek16UnJjMk0wTUU5cGFITTVNV2xwT0VKSU55dHdjVWN5TUhSSWIxUjRPRzFWTlZCb1FXVk5lUzl3ZVVvMlZIcEtTQ3RMTTB0VE15czNXSGw2WWpZMWIyeExTMGMyUlZBclNIWXlORU5vWlRFM2RtcG1ZMXBVU2xCUVdHOWxka0YxYjBsVWEyNHpUbEZuWXk4emRqVllTaXN5YmtaVVpUbDNSamQxVEhBMlIxVXpNMk4xWVV4UlZWbFdkRXBUUm5sa1NtSnlXRmt3TW1ka1ZGWnBiVVJzVmxoNE5HSm9WWGx0ZEU1TVdtOU5XSFZGVVhkUk5raHhXR2hIT1ZjMlNtVjNUMDlhVlc1MlRIRXdSRkZNTVdsUlVsaHFWV1YwWTNwcGEybDBhbkZQUzFoSFJWVnFWbkJHVDJOSk56SnNiaTl5TDBSUE1qZFZZVTB3ZDBzMGVVZFFhR2t5Ykhad1UyOUVWbmd5U0cwM1VDOWlTSGRWVTBkbFMzUkRjbWdyVWt4TmRURlpVWEpKYlVWTWFIY3JWRGhFYkZFM09HUkpaSEZhWVZKT04xTnBlWEIwZFZsU2Eyd3pZelpxUlhjMU9YUlZkM0kzWkZNM0wxcEJTakZOWmxWNlZsYzNaRFZ3VTNWVU9HNTBSMjFwZFRNemVreEVabUZTYlZGVldUUldkRU5SVDNsRVVrcFRiRzVHTjNocmEyNXJZbmhuVGtkQ1ZGQkdjRTl3YVRGVllsQTViMngwUkROcVExRnRZV0ZpU2pZNVMyRTRhSEV3YjNkbk5tbDVjekZJWnpSM2FrOVFVWFJSVTJGeFlXSjNVbVV2WVVRNVJHWjZVVVpYZERCVGNXOXRSbmg1WW14M1FubHZVMUY1WldONlVucGpiUzlOTm5ocE9YSmxObmR4VEZvMmFXc3dlR05IVlRRNGRISTVhVEZXV0dKNGJFOW9TVXN4Y3psdE9VTTJTazVWVG5SQ2MzZHJaSGhLVkZKQ1EwNUlTMVZ0Wnk5SGJtWlFkR1UwU2xrcmJVNHJWemhCUVVaM2J6QkNVRUZOTVc1RGNUZG5lV3RqVUd4bVQwVXlNVUpKYUhSYU5FZFBUWGREY25SbWRVNDVTUzk1VVZKNlpXSXhPRWN5YTFWaWRqUnhRV2QyTmpSMVFtcE5TblpoTWxoWVFrMHdWRWw0TkZsNGVsaGtOMkowTVNzMGMyTjZaRTVqYm14eE4zbExTMEZ6UW1OYVVFUmpOSEJZWkZKdVkzZFZaSEpUZW5NdlIycGtRWFkwUTNVclkySjFhVVJLTWxOeVVqZFhhejAudWcyUU82TlMtXy12VFlJbUVXY3d0bkI1ZzBuZ2QxNHhnU1BpSFNyNXBjUktJSXVkYndpanZSMkJQdTJaSzlfbzJrSnpHRzktY05iVFBZT0k3RFdWZkE=" />
+            <input type="hidden" name="_eventId" value="submit" />
+
+            <input class="btn-submit" name="submit" accesskey="l" value="LOGIN" tabindex="6" type="submit" />
+            <input class="btn-reset" name="reset" accesskey="c" value="CLEAR" tabindex="7" type="reset" />
+        </section>
+    </form>
+</div>
+
+<div id="sidebar">
+    <div class="sidebar-content">
+        <!--
+	<p>For security reasons, please <a href="logout">log out</a> and exit your web browser when you are done accessing services that require authentication!</p>
+	
+        
+
+        <div id="list-languages">
+            
+            
+            
+
+            <h3>Languages:</h3>
+
+            
+                
+                
+                    
+                    <ul>
+                        <li class="first"><a href="login?service=https://spot.upi.edu/beranda&locale=en">English</a></li>
+                        <li><a href="login?service=https://spot.upi.edu/beranda&locale=es">Spanish</a></li>
+                        <li><a href="login?service=https://spot.upi.edu/beranda&locale=fr">French</a></li>
+                        <li><a href="login?service=https://spot.upi.edu/beranda&locale=ru">Russian</a></li>
+                        <li><a href="login?service=https://spot.upi.edu/beranda&locale=nl">Nederlands</a></li>
+                        <li><a href="login?service=https://spot.upi.edu/beranda&locale=sv">Svenska</a></li>
+                        <li><a href="login?service=https://spot.upi.edu/beranda&locale=it">Italiano</a></li>
+                        <li><a href="login?service=https://spot.upi.edu/beranda&locale=ur">Urdu</a></li>
+                        <li><a href="login?service=https://spot.upi.edu/beranda&locale=zh_CN">Chinese (Simplified)</a></li>
+                        <li><a href="login?service=https://spot.upi.edu/beranda&locale=zh_TW">Chinese (Traditional)</a></li>
+                        <li><a href="login?service=https://spot.upi.edu/beranda&locale=de">Deutsch</a></li>
+                        <li><a href="login?service=https://spot.upi.edu/beranda&locale=ja">Japanese</a></li>
+                        <li><a href="login?service=https://spot.upi.edu/beranda&locale=hr">Croatian</a></li>
+                        <li><a href="login?service=https://spot.upi.edu/beranda&locale=uk">Ukranian</a></li>
+                        <li><a href="login?service=https://spot.upi.edu/beranda&locale=cs">Czech</a></li>
+                        <li><a href="login?service=https://spot.upi.edu/beranda&locale=sk">Slovak</a></li>
+                        <li><a href="login?service=https://spot.upi.edu/beranda&locale=sl">Slovenian</a></li>
+                        <li><a href="login?service=https://spot.upi.edu/beranda&locale=ca">Catalan</a></li>
+                        <li><a href="login?service=https://spot.upi.edu/beranda&locale=mk">Macedonian</a></li>
+                        <li><a href="login?service=https://spot.upi.edu/beranda&locale=fa">Farsi</a></li>
+                        <li><a href="login?service=https://spot.upi.edu/beranda&locale=ar">Arabic</a></li>
+                        <li><a href="login?service=https://spot.upi.edu/beranda&locale=pt_PT">Portuguese</a></li>
+                        <li><a href="login?service=https://spot.upi.edu/beranda&locale=pt_BR">Portuguese (Brazil)</a></li>
+                        <li class="last"><a href="login?service=https://spot.upi.edu/beranda&locale=pl">Polish</a></li>
+                    </ul>
+                
+            
+        </div>
+	-->
+
+        <h2>Selamat datang di Single Sign On (SSO) UPI</h2>
+        <img src="images/logo-toga.png" alt="" class="pull-left thumbnail" style="margin-right: 15px; float: left;" width="180">
+	<p style="text-align:justify">Seiring dengan sistem manajemen terintegrasi, SSO UPI merupakan salah satu gerbang integrasi berbagai aplikasi yang diberdayakan untuk civitas UPI. 
+	<!--Aplikasi yang diintegrasi ke dalam SSO Dosen ini terdiri atas 10 (sepuluh) aplikasi yaitu Aplikasi 
+	<b>Profil Dosen</b>, Aplikasi<b> Perwalian</b>, Aplikasi<b> Sinndo</b>, Aplikasi<b> SIAS</b>, Aplikasi<b> Litabmas</b>, 
+	Aplikasi<b> BKD</b>, Aplikasi<b> SIMPEG</b>, Aplikasi<b> Repository File</b>, Aplikasi<b> Evaluasi-PBM</b>,  dan Aplikasi<b> Agenda</b>.--></p>
+        <p style="text-align:justify">Semoga SSO UPI ini dapat mempermudah civitas dalam memberdayakan dan menganalisis hasil aplikasi yang ada, 
+	serta untuk terus menyempurnakan dari berbagai aspek. Masukan bapak/ibu dapat disampaikan melalui <b>layanan-tik[at]upi.edu</b>.</p>        
+
+
+    </div>
+</div>
+
+
+
+</div> <!-- END #content -->
+
+<footer>
+  <div id="copyright" class="container">
+    <p>Copyright &copy; 2005&ndash;2015 Apereo, Inc. </p>
+        <!--<p>Powered by <a href="http://www.apereo.org/cas">
+            Apereo Central Authentication Service 4.2.7</a>
+            2016-11-03T15:21:44.000+07:00</p>-->
+  </div>
+</footer>
+
+</div> <!-- END #container -->
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/headjs/1.0.3/head.min.js"></script>
+
+<script type="text/javascript" src="/cas/js/cas.js"></script>
+
+</body>
+</html>
+
+
