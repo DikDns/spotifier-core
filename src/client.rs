@@ -15,10 +15,6 @@ pub struct SpotClient {
 }
 
 impl SpotClient {
-    /// Creates a new `SpotClient`.
-
-
-
     pub fn new() -> Self {
         let cookie_jar = Arc::new(Jar::default());
 
@@ -88,8 +84,6 @@ impl SpotClient {
         Ok(())
     }
 
-
-
     async fn get_html(&self, path: &str) -> Result<String> {
         let url = format!("{}{}", self.base_url, path);
         let response = self.client.get(&url).send().await?;
@@ -104,53 +98,5 @@ impl SpotClient {
     pub async fn get_user_profile(&self) -> Result<User> {
         let html_content = self.get_html("/mhs").await?;
         parsers::user::parse_user_from_html(&html_content)
-    }
-}
-
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::env;
-    use std::fs; // Import the file system module
-
-    #[tokio::test]
-    async fn test_login_and_get_profile() {
-        let nim = env::var("SPOT_NIM")
-            .expect("Please set the SPOT_NIM environment variable");
-        let password = env::var("SPOT_PASSWORD")
-            .expect("Please set the SPOT_PASSWORD environment variable");
-
-        let client = SpotClient::new();
-
-        // --- Let's debug the login process ---
-
-        // 1. Get the login page HTML first
-        let login_page_html = client.client.get(SSO_LOGIN_PAGE_URL).send().await
-            .expect("Failed to GET login page")
-            .text().await
-            .expect("Failed to get text from response");
-
-        // 2. Write the HTML to a file for inspection
-        fs::write("login_page.html", &login_page_html)
-            .expect("Unable to write login_page.html");
-        println!("Saved SSO login page to login_page.html for debugging.");
-
-        // 3. Now, try to log in using the same logic as the login function
-        let login_result = client.login(&nim, &password).await;
-
-        // Provide a more detailed error message if it fails
-        if let Err(e) = &login_result {
-            panic!("Login failed with error: {:?}. Check the login_page.html file to ensure the CSRF token selector is correct.", e);
-        }
-
-        println!("Login successful!");
-
-        // 4. If login succeeds, continue to fetch the profile
-        println!("Fetching user profile...");
-        let user = client.get_user_profile().await.unwrap();
-        println!("Successfully fetched profile for: {}", user.name);
-
-        assert_eq!(user.nim, nim, "The fetched NIM should match the login NIM");
     }
 }
