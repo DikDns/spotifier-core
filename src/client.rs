@@ -29,6 +29,7 @@ pub struct SpotifierCoreClient {
     delay_config: DelayConfig,
     cookie_jar: Arc<Jar>,
     cache: Option<Arc<dyn CacheBackend>>,
+    cache_prefix: Option<String>,
 }
 
 impl SpotifierCoreClient {
@@ -57,12 +58,25 @@ impl SpotifierCoreClient {
             delay_config,
             cookie_jar,
             cache: None,
+            cache_prefix: None,
         }
     }
 
     /// Sets the cache backend for the client.
     pub fn set_cache(&mut self, cache: Arc<dyn CacheBackend>) {
         self.cache = Some(cache);
+    }
+
+    /// Sets a prefix/namespace for all cache keys (useful for multi-user apps).
+    pub fn set_cache_prefix(&mut self, prefix: &str) {
+        self.cache_prefix = Some(prefix.to_string());
+    }
+
+    fn get_cache_key(&self, key: &str) -> String {
+        match &self.cache_prefix {
+            Some(prefix) => format!("{}:{}", prefix, key),
+            None => key.to_string(),
+        }
     }
 
     /// Saves the current session cookies to a JSON file.
@@ -99,13 +113,18 @@ impl SpotifierCoreClient {
             ScraperError::ParsingError(format!("Failed to deserialize cookies: {}", e))
         })?;
 
+        let spot_url = "https://spot.upi.edu".parse().unwrap();
+        let sso_url = "https://sso.upi.edu".parse().unwrap();
+
         if let Some(c) = cookie_map.get("spot") {
-            let url = "https://spot.upi.edu".parse().unwrap();
-            self.cookie_jar.add_cookie_str(c, &url);
+            for cookie in c.split(';') {
+                self.cookie_jar.add_cookie_str(cookie.trim(), &spot_url);
+            }
         }
         if let Some(c) = cookie_map.get("sso") {
-            let url = "https://sso.upi.edu".parse().unwrap();
-            self.cookie_jar.add_cookie_str(c, &url);
+            for cookie in c.split(';') {
+                self.cookie_jar.add_cookie_str(cookie.trim(), &sso_url);
+            }
         }
 
         Ok(())
@@ -194,7 +213,6 @@ impl SpotifierCoreClient {
         // Action-specific jitter: Add a longer delay (2-5 seconds) after successful login.
         if self.delay_config.enabled {
             let jitter_ms = rand::rng().random_range(2000..=5000);
-            println!("DEBUG: Login success jitter ({}ms)...", jitter_ms);
             sleep(std::time::Duration::from_millis(jitter_ms)).await;
         }
 
@@ -231,9 +249,9 @@ impl SpotifierCoreClient {
     }
 
     pub async fn get_courses(&self) -> Result<Vec<Course>> {
-        let cache_key = "courses";
+        let cache_key = self.get_cache_key("courses");
         if let Some(cache) = &self.cache {
-            if let Some(cached_data) = cache.get(cache_key).await {
+            if let Some(cached_data) = cache.get(&cache_key).await {
                 if let Ok(courses) = serde_json::from_str(&cached_data) {
                     return Ok(courses);
                 }
@@ -245,7 +263,7 @@ impl SpotifierCoreClient {
 
         if let Some(cache) = &self.cache {
             if let Ok(json) = serde_json::to_string(&courses) {
-                let _ = cache.set(cache_key, &json, 3600).await; // 1 hour TTL
+                let _ = cache.set(&cache_key, &json, 3600).await; // 1 hour TTL
             }
         }
 

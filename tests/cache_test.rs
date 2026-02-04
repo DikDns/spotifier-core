@@ -60,17 +60,24 @@ async fn test_course_list_caching() -> Result<()> {
         ..Default::default()
     });
 
+    let nim_copy = nim.clone();
     let cache = Arc::new(FileCache::new(cache_dir));
     client.set_cache(cache);
+    client.set_cache_prefix(&nim_copy); // Use NIM as namespace
 
     client.login(&nim, &password).await?;
 
-    println!("Fetching courses for the first time (caching)...");
+    println!("Fetching courses with prefix {}...", nim_copy);
     let courses1 = client.get_courses().await?;
     assert!(!courses1.is_empty());
 
-    let cache_file = cache_dir.join("courses.json");
-    assert!(cache_file.exists(), "Cache file should be created");
+    // The file name should now contain the prefix: "{nim}:courses.json"
+    let cache_file = cache_dir.join(format!("{}:courses.json", nim_copy));
+    assert!(
+        cache_file.exists(),
+        "Namespaced cache file {:?} should be created",
+        cache_file
+    );
 
     println!("Fetching courses for the second time (from cache)...");
     // We can simulate offline or just check if it works
