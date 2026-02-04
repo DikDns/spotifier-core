@@ -113,3 +113,85 @@ async fn test_full_login_and_scrape_flow() -> Result<()> {
 
     Ok(())
 }
+
+/// Test the new get_course_detail_by_id method
+#[tokio::test]
+async fn test_get_course_detail_by_id() -> Result<()> {
+    let env_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(".env");
+    from_path(&env_path).ok();
+
+    let nim = env::var("SPOT_NIM").expect("ERROR: SPOT_NIM environment variable not set.");
+    let password =
+        env::var("SPOT_PASSWORD").expect("ERROR: SPOT_PASSWORD environment variable not set.");
+
+    let client = SpotifierCoreClient::new();
+    client.login(&nim, &password).await?;
+
+    // First get the courses to find a valid ID
+    let courses = client.get_courses().await?;
+    assert!(!courses.is_empty(), "Need at least one course for testing");
+
+    let first_course_id = courses[0].id;
+
+    // Test the ID-based method
+    let course_detail = client.get_course_detail_by_id(first_course_id).await?;
+
+    // Verify the result
+    assert_eq!(
+        course_detail.course_info.id, first_course_id,
+        "Course ID should match"
+    );
+    assert!(
+        !course_detail.course_info.name.is_empty(),
+        "Course name should be populated"
+    );
+
+    println!(
+        "✅ get_course_detail_by_id test passed for course ID: {}",
+        first_course_id
+    );
+
+    Ok(())
+}
+
+/// Test the new get_topic_detail_by_id method
+#[tokio::test]
+async fn test_get_topic_detail_by_id() -> Result<()> {
+    let env_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(".env");
+    from_path(&env_path).ok();
+
+    let nim = env::var("SPOT_NIM").expect("ERROR: SPOT_NIM environment variable not set.");
+    let password =
+        env::var("SPOT_PASSWORD").expect("ERROR: SPOT_PASSWORD environment variable not set.");
+
+    let client = SpotifierCoreClient::new();
+    client.login(&nim, &password).await?;
+
+    // Get courses and find one with accessible topics
+    let courses = client.get_courses().await?;
+
+    for course in courses.iter() {
+        let course_detail = client.get_course_detail(course).await?;
+
+        if let Some(topic) = course_detail.topics.iter().find(|t| t.is_accessible) {
+            let course_id = topic.course_id.unwrap();
+            let topic_id = topic.id.unwrap();
+
+            // Test the ID-based method
+            let topic_detail = client.get_topic_detail_by_id(course_id, topic_id).await?;
+
+            // Verify the result
+            assert_eq!(topic_detail.id, topic_id, "Topic ID should match");
+
+            println!(
+                "✅ get_topic_detail_by_id test passed for course ID: {}, topic ID: {}",
+                course_id, topic_id
+            );
+
+            return Ok(());
+        }
+    }
+
+    println!("⚠️ No accessible topics found to test get_topic_detail_by_id");
+    Ok(())
+}

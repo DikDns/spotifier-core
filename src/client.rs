@@ -132,4 +132,27 @@ impl SpotifierCoreClient {
         let html_content = self.get_html(href).await?;
         parsers::topic_detail::parse_topic_detail_from_html(&html_content, topic_id, course_id)
     }
+
+    pub async fn get_course_detail_by_id(&self, course_id: u64) -> Result<DetailCourse> {
+        let courses = self.get_courses().await?;
+
+        let course = courses
+            .into_iter()
+            .find(|c| c.id == course_id)
+            .ok_or_else(|| {
+                ScraperError::ParsingError(format!("Course with ID {} not found", course_id))
+            })?;
+
+        self.get_course_detail(&course).await
+    }
+
+    pub async fn get_topic_detail_by_id(
+        &self,
+        course_id: u64,
+        topic_id: u64,
+    ) -> Result<TopicDetail> {
+        let path = format!("/mhs/materi/{}/{}", course_id, topic_id);
+        let html_content = self.get_html(&path).await?;
+        parsers::topic_detail::parse_topic_detail_from_html(&html_content, topic_id, course_id)
+    }
 }
