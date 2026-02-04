@@ -1,10 +1,11 @@
 // tests/integration_test.rs
 
-use dotenvy::dotenv;
+use dotenvy::from_path;
 use spot_scraper::{Result, SpotClient};
 use std::env;
 use std::fs::File;
 use std::io::Write;
+use std::path::PathBuf;
 
 /// This is a complete end-to-end integration test.
 /// It logs in, fetches the user profile, the course list, the details of the first course,
@@ -16,9 +17,13 @@ use std::io::Write;
 /// SPOT_NIM="your_nim" SPOT_PASSWORD="your_password" cargo test -- --nocapture
 #[tokio::test]
 async fn test_full_login_and_scrape_flow() -> Result<()> {
-    dotenv().ok();
-    // --- SETUP: Create a log file to store all output ---
-    let mut log_file = File::create("test_output.log").expect("Could not create log file.");
+    // Load .env from project root
+    let env_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(".env");
+    from_path(&env_path).ok();
+
+    // --- SETUP: Create output directory and log file ---
+    std::fs::create_dir_all("output").expect("Could not create output directory.");
+    let mut log_file = File::create("output/test_output.log").expect("Could not create log file.");
 
     // --- SETUP: Load credentials from environment variables ---
     let nim = env::var("SPOT_NIM").expect("ERROR: SPOT_NIM environment variable not set.");
@@ -104,7 +109,7 @@ async fn test_full_login_and_scrape_flow() -> Result<()> {
         "\n--- Integration Test Completed Successfully ---"
     )
     .unwrap();
-    println!("Test finished. Please check 'test_output.log' for the detailed results.");
+    println!("Test finished. Please check 'output/test_output.log' for the detailed results.");
 
     Ok(())
 }

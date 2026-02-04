@@ -1,10 +1,11 @@
 // tests/all_topics_test.rs
 
-use dotenvy::dotenv;
+use dotenvy::from_path;
 use spot_scraper::{Result, SpotClient};
 use std::env;
 use std::fs::File;
 use std::io::Write;
+use std::path::PathBuf;
 use std::time::Duration;
 use tokio::time::sleep;
 
@@ -19,9 +20,14 @@ use tokio::time::sleep;
 #[tokio::test]
 #[ignore] // Jalankan ini jika kamu benar-benar ingin menjalankan test yang intensif ini
 async fn test_scrape_all_topics() -> Result<()> {
-    dotenv().ok();
-    // --- SETUP: Buat file log ---
-    let mut log_file = File::create("all_topics_output.log").expect("Tidak bisa membuat file log.");
+    // Load .env from project root
+    let env_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(".env");
+    from_path(&env_path).ok();
+
+    // --- SETUP: Buat output directory dan file log ---
+    std::fs::create_dir_all("output").expect("Tidak bisa membuat output directory.");
+    let mut log_file =
+        File::create("output/all_topics_output.log").expect("Tidak bisa membuat file log.");
 
     // --- SETUP: Ambil kredensial ---
     let nim = env::var("SPOT_NIM").expect("ERROR: Environment variable SPOT_NIM tidak di-set.");
@@ -157,7 +163,7 @@ async fn test_scrape_all_topics() -> Result<()> {
 
     writeln!(log_file, "\n--- Full Topic Scraping Test Selesai ---").unwrap();
     println!("\n--- Full Topic Scraping Test Selesai ---");
-    println!("Semua output telah disimpan di 'all_topics_output.log'.");
+    println!("Semua output telah disimpan di 'output/all_topics_output.log'.");
 
     Ok(())
 }
