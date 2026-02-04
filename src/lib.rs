@@ -1,10 +1,10 @@
-// Declare all our modules
+mod cache;
 mod client;
 mod error;
 mod models;
 mod parsers;
 
-// Publicly export the parts of our library that users will need
+pub use cache::{CacheBackend, FileCache};
 pub use client::SpotifierCoreClient;
 pub use error::{Result, ScraperError};
 pub use models::*;

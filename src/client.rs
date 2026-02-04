@@ -1,10 +1,11 @@
+use crate::cache::CacheBackend;
 use crate::error::{Result, ScraperError};
 use crate::models::{
     Course, DelayConfig, DetailCourse, Period, Semester, TopicDetail, TopicInfo, User,
 };
 use crate::parsers;
 use rand::Rng;
-use reqwest::cookie::Jar;
+use reqwest::cookie::{CookieStore, Jar};
 use reqwest::header::{HeaderMap, USER_AGENT};
 use reqwest::multipart;
 use scraper::{Html, Selector};
@@ -26,6 +27,8 @@ pub struct SpotifierCoreClient {
     client: reqwest::Client,
     base_url: String,
     delay_config: DelayConfig,
+    cookie_jar: Arc<Jar>,
+    cache: Option<Arc<dyn CacheBackend>>,
 }
 
 impl SpotifierCoreClient {
@@ -43,7 +46,7 @@ impl SpotifierCoreClient {
 
         let client = reqwest::Client::builder()
             .cookie_store(true)
-            .cookie_provider(cookie_jar)
+            .cookie_provider(Arc::clone(&cookie_jar))
             .default_headers(headers) // Use the headers
             .build()
             .unwrap();
@@ -52,7 +55,60 @@ impl SpotifierCoreClient {
             client,
             base_url: "https://spot.upi.edu".to_string(),
             delay_config,
+            cookie_jar,
+            cache: None,
         }
+    }
+
+    /// Sets the cache backend for the client.
+    pub fn set_cache(&mut self, cache: Arc<dyn CacheBackend>) {
+        self.cache = Some(cache);
+    }
+
+    /// Saves the current session cookies to a JSON file.
+    pub async fn save_cookies(&self, path: &std::path::Path) -> Result<()> {
+        let spot_url = "https://spot.upi.edu".parse().unwrap();
+        let sso_url = "https://sso.upi.edu".parse().unwrap();
+
+        let mut cookie_map = HashMap::new();
+        if let Some(c) = self.cookie_jar.cookies(&spot_url) {
+            cookie_map.insert("spot", c.to_str().unwrap_or_default().to_string());
+        }
+        if let Some(c) = self.cookie_jar.cookies(&sso_url) {
+            cookie_map.insert("sso", c.to_str().unwrap_or_default().to_string());
+        }
+
+        let json = serde_json::to_string_pretty(&cookie_map).map_err(|e| {
+            ScraperError::ParsingError(format!("Failed to serialize cookies: {}", e))
+        })?;
+
+        tokio::fs::write(path, json).await.map_err(|e| {
+            ScraperError::ParsingError(format!("Failed to write cookie file: {}", e))
+        })?;
+
+        Ok(())
+    }
+
+    /// Loads session cookies from a JSON file.
+    pub async fn load_cookies(&self, path: &std::path::Path) -> Result<()> {
+        let json = tokio::fs::read_to_string(path).await.map_err(|e| {
+            ScraperError::ParsingError(format!("Failed to read cookie file: {}", e))
+        })?;
+
+        let cookie_map: HashMap<String, String> = serde_json::from_str(&json).map_err(|e| {
+            ScraperError::ParsingError(format!("Failed to deserialize cookies: {}", e))
+        })?;
+
+        if let Some(c) = cookie_map.get("spot") {
+            let url = "https://spot.upi.edu".parse().unwrap();
+            self.cookie_jar.add_cookie_str(c, &url);
+        }
+        if let Some(c) = cookie_map.get("sso") {
+            let url = "https://sso.upi.edu".parse().unwrap();
+            self.cookie_jar.add_cookie_str(c, &url);
+        }
+
+        Ok(())
     }
 
     /// Sets a new delay configuration for the client.
@@ -175,8 +231,25 @@ impl SpotifierCoreClient {
     }
 
     pub async fn get_courses(&self) -> Result<Vec<Course>> {
+        let cache_key = "courses";
+        if let Some(cache) = &self.cache {
+            if let Some(cached_data) = cache.get(cache_key).await {
+                if let Ok(courses) = serde_json::from_str(&cached_data) {
+                    return Ok(courses);
+                }
+            }
+        }
+
         let html_content = self.get_html("/mhs").await?;
-        parsers::courses::parse_courses_from_html(&html_content)
+        let courses = parsers::courses::parse_courses_from_html(&html_content)?;
+
+        if let Some(cache) = &self.cache {
+            if let Ok(json) = serde_json::to_string(&courses) {
+                let _ = cache.set(cache_key, &json, 3600).await; // 1 hour TTL
+            }
+        }
+
+        Ok(courses)
     }
 
     pub async fn get_course_detail(&self, course: &Course) -> Result<DetailCourse> {
