@@ -1,35 +1,48 @@
 use crate::error::{Result, ScraperError};
-use crate::models::{Course, DetailCourse, Period, Semester, TopicDetail, TopicInfo, User};
+use crate::models::{
+    Course, DelayConfig, DetailCourse, Period, Semester, TopicDetail, TopicInfo, User,
+};
 use crate::parsers;
+use rand::Rng;
 use reqwest::cookie::Jar;
 use reqwest::header::{HeaderMap, USER_AGENT};
 use reqwest::multipart;
 use scraper::{Html, Selector};
 use std::collections::HashMap;
 use std::sync::Arc;
+use tokio::time::sleep;
 
 const SSO_LOGIN_PAGE_URL: &str =
     "https://sso.upi.edu/cas/login?service=https://spot.upi.edu/beranda";
 
+const MODERN_USER_AGENTS: &[&str] = &[
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:133.0) Gecko/20100101 Firefox/133.0",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Safari/605.1.15",
+];
+
 pub struct SpotifierCoreClient {
     client: reqwest::Client,
     base_url: String,
+    delay_config: DelayConfig,
 }
 
 impl SpotifierCoreClient {
     pub fn new() -> Self {
+        Self::with_config(DelayConfig::default())
+    }
+
+    pub fn with_config(delay_config: DelayConfig) -> Self {
         let cookie_jar = Arc::new(Jar::default());
 
-        // --- CHANGE 1: Add a default User-Agent header ---
         let mut headers = HeaderMap::new();
-        headers.insert(
-            USER_AGENT,
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.0.0 Safari/537.36"
-                .parse()
-                .unwrap(),
-        );
+        // Pick a random User-Agent at initialization
+        let ua = MODERN_USER_AGENTS[rand::rng().random_range(0..MODERN_USER_AGENTS.len())];
+        headers.insert(USER_AGENT, ua.parse().unwrap());
 
         let client = reqwest::Client::builder()
+            .cookie_store(true)
             .cookie_provider(cookie_jar)
             .default_headers(headers) // Use the headers
             .build()
@@ -38,13 +51,63 @@ impl SpotifierCoreClient {
         Self {
             client,
             base_url: "https://spot.upi.edu".to_string(),
+            delay_config,
         }
+    }
+
+    /// Sets a new delay configuration for the client.
+    pub fn set_delay_config(&mut self, config: DelayConfig) {
+        self.delay_config = config;
+    }
+
+    fn get_random_ua(&self) -> &'static str {
+        MODERN_USER_AGENTS[rand::rng().random_range(0..MODERN_USER_AGENTS.len())]
+    }
+
+    /// Waits for a random duration based on delay_config.
+    async fn wait_random(&self) {
+        if !self.delay_config.enabled {
+            return;
+        }
+
+        let ms = rand::rng()
+            .random_range(self.delay_config.min_delay_ms..=self.delay_config.max_delay_ms);
+        sleep(std::time::Duration::from_millis(ms)).await;
+    }
+
+    /// Helper to perform a GET request with randomized delay and rotated UA.
+    async fn get_request(&self, url: &str) -> Result<reqwest::Response> {
+        self.wait_random().await;
+        let ua = self.get_random_ua();
+        self.client
+            .get(url)
+            .header(USER_AGENT, ua)
+            .send()
+            .await
+            .map_err(ScraperError::from)
+    }
+
+    /// Helper to perform a POST request with randomized delay and rotated UA.
+    async fn post_request<T: serde::Serialize + ?Sized>(
+        &self,
+        url: &str,
+        form: &T,
+    ) -> Result<reqwest::Response> {
+        self.wait_random().await;
+        let ua = self.get_random_ua();
+        self.client
+            .post(url)
+            .header(USER_AGENT, ua)
+            .form(form)
+            .send()
+            .await
+            .map_err(ScraperError::from)
     }
 
     /// Logs into SPOT using a student ID (NIM) and password.
     pub async fn login(&self, nim: &str, password: &str) -> Result<()> {
         // --- STEP 1: GET the login page to get the "execution" token ---
-        let response = self.client.get(SSO_LOGIN_PAGE_URL).send().await?;
+        let response = self.get_request(SSO_LOGIN_PAGE_URL).await?;
 
         // The service URL is now part of the request URL itself
         let login_action_url = response.url().clone();
@@ -69,11 +132,15 @@ impl SpotifierCoreClient {
 
         // --- CHANGE 2: Post to the full URL including the '?service=...' part ---
         let response = self
-            .client
-            .post(login_action_url)
-            .form(&params)
-            .send()
+            .post_request(login_action_url.as_str(), &params)
             .await?;
+
+        // Action-specific jitter: Add a longer delay (2-5 seconds) after successful login.
+        if self.delay_config.enabled {
+            let jitter_ms = rand::rng().random_range(2000..=5000);
+            println!("DEBUG: Login success jitter ({}ms)...", jitter_ms);
+            sleep(std::time::Duration::from_millis(jitter_ms)).await;
+        }
 
         // --- STEP 3: Verify the final redirection URL ---
         let final_url = response.url().clone();
@@ -93,7 +160,7 @@ impl SpotifierCoreClient {
 
     async fn get_html(&self, path: &str) -> Result<String> {
         let url = format!("{}{}", self.base_url, path);
-        let response = self.client.get(&url).send().await?;
+        let response = self.get_request(&url).await?;
 
         if !response.url().path().starts_with(path) {
             return Err(ScraperError::SessionExpired);

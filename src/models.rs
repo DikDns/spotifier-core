@@ -180,3 +180,24 @@ impl std::fmt::Display for Period {
         write!(f, "{}", self.format())
     }
 }
+
+/// Configuration for human-like delays between requests
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DelayConfig {
+    /// Minimum delay in milliseconds
+    pub min_delay_ms: u64,
+    /// Maximum delay in milliseconds
+    pub max_delay_ms: u64,
+    /// Whether delays are enabled
+    pub enabled: bool,
+}
+
+impl Default for DelayConfig {
+    fn default() -> Self {
+        Self {
+            min_delay_ms: 1000,
+            max_delay_ms: 3000,
+            enabled: true,
+        }
+    }
+}
