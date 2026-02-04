@@ -1,5 +1,5 @@
 use crate::error::{Result, ScraperError};
-use crate::models::{Course, DetailCourse, TopicDetail, TopicInfo, User};
+use crate::models::{Course, DetailCourse, Period, Semester, TopicDetail, TopicInfo, User};
 use crate::parsers;
 use reqwest::cookie::Jar;
 use reqwest::header::{HeaderMap, USER_AGENT};
@@ -154,5 +154,54 @@ impl SpotifierCoreClient {
         let path = format!("/mhs/materi/{}/{}", course_id, topic_id);
         let html_content = self.get_html(&path).await?;
         parsers::topic_detail::parse_topic_detail_from_html(&html_content, topic_id, course_id)
+    }
+
+    pub async fn change_period(&self, year: u16, semester: Semester) -> Result<()> {
+        let period = Period::new(year, semester);
+        let path = format!("/adm/semester/{}", period.format());
+
+        let response = self
+            .client
+            .get(format!("{}{}", self.base_url, path))
+            .send()
+            .await?;
+
+        let status = response.status();
+
+        // Success: 200 OK or 302 redirect to /adm
+        if status.is_success() || status.is_redirection() {
+            // Check if we actually redirected to /adm (success indicator)
+            let final_url = response.url();
+            if final_url.path() == "/adm" || final_url.path().starts_with("/adm") {
+                return Ok(());
+            }
+        }
+
+        // 500 error means invalid period format
+        if status.as_u16() == 500 {
+            return Err(ScraperError::InvalidPeriod(format!(
+                "Period {} is not valid or unavailable",
+                period.format()
+            )));
+        }
+
+        // Any other error
+        Err(ScraperError::ParsingError(format!(
+            "Failed to change period, status: {}",
+            status
+        )))
+    }
+
+    pub async fn get_current_period_info(&self) -> Result<String> {
+        let courses = self.get_courses().await?;
+
+        if let Some(first_course) = courses.first() {
+            // Return raw string: "2025/2026 - Genap" or "2025/2026 - Ganjil"
+            Ok(first_course.academic_year.clone())
+        } else {
+            Err(ScraperError::ParsingError(
+                "No courses found to determine current period".to_string(),
+            ))
+        }
     }
 }

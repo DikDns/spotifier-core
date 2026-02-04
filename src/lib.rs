@@ -7,4 +7,4 @@ mod parsers;
 // Publicly export the parts of our library that users will need
 pub use client::SpotifierCoreClient;
 pub use error::{Result, ScraperError};
-pub use models::*; // Exposes all structs like User, Course, etc.
+pub use models::*;

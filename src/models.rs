@@ -93,3 +93,90 @@ pub struct TopicDetail {
     pub contents: Vec<Content>,
     pub tasks: Vec<Task>,
 }
+
+/// Represents the type of academic semester
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Semester {
+    /// Odd semester (Ganjil) - typically Sep-Jan
+    Odd = 1,
+    /// Even semester (Genap) - typically Feb-June
+    Even = 2,
+    /// Short semester (SP/Semester Pendek) - typically July-Aug
+    Short = 3,
+}
+
+impl Semester {
+    /// Convert to numeric value for period format
+    pub fn as_num(&self) -> u8 {
+        *self as u8
+    }
+}
+
+/// Helper struct to format and parse academic periods
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Period {
+    pub year: u16,
+    pub semester: Semester,
+}
+
+impl Period {
+    pub fn new(year: u16, semester: Semester) -> Self {
+        Self { year, semester }
+    }
+
+    /// Format as YYYYN string (e.g., "20251")
+    pub fn format(&self) -> String {
+        format!("{}{}", self.year, self.semester.as_num())
+    }
+
+    /// Parse academic year string to Period.
+    ///
+    /// Accepts formats like:
+    /// - "2025/2026 - Genap" -> Period { year: 2025, semester: Semester::Even }
+    /// - "2025/2026 - Ganjil" -> Period { year: 2025, semester: Semester::Odd }
+    /// - "2024/2025 - SP" -> Period { year: 2024, semester: Semester::Short }
+    pub fn from_academic_year_string(s: &str) -> crate::error::Result<Self> {
+        use crate::error::ScraperError;
+
+        // Parse "2025/2026 - Genap" format
+        let parts: Vec<&str> = s.split('-').map(|p| p.trim()).collect();
+
+        if parts.len() != 2 {
+            return Err(ScraperError::ParsingError(format!(
+                "Invalid academic year format: {}",
+                s
+            )));
+        }
+
+        // Parse year from "2025/2026" -> 2025
+        let year_part = parts[0];
+        let year = year_part
+            .split('/')
+            .next()
+            .and_then(|y| y.parse::<u16>().ok())
+            .ok_or_else(|| {
+                ScraperError::ParsingError(format!("Cannot parse year from: {}", year_part))
+            })?;
+
+        // Parse semester: "Genap", "Ganjil", "SP"
+        let semester = match parts[1].to_lowercase().as_str() {
+            "genap" => Semester::Even,
+            "ganjil" => Semester::Odd,
+            "sp" | "semester pendek" => Semester::Short,
+            other => {
+                return Err(ScraperError::ParsingError(format!(
+                    "Unknown semester type: {}",
+                    other
+                )));
+            }
+        };
+
+        Ok(Period::new(year, semester))
+    }
+}
+
+impl std::fmt::Display for Period {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.format())
+    }
+}

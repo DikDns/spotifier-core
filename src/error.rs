@@ -20,6 +20,9 @@ pub enum ScraperError {
 
     #[error("Could not find required element on the page: {0}")]
     ElementNotFound(String),
+
+    #[error("Invalid period format: {0}")]
+    InvalidPeriod(String),
 }
 
 pub type Result<T> = std::result::Result<T, ScraperError>;
