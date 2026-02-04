@@ -23,6 +23,12 @@ pub enum ScraperError {
 
     #[error("Invalid period format: {0}")]
     InvalidPeriod(String),
+
+    #[error("Task submission failed: {0}")]
+    TaskSubmissionFailed(String),
+
+    #[error("Task deletion failed: {0}")]
+    TaskDeletionFailed(String),
 }
 
 pub type Result<T> = std::result::Result<T, ScraperError>;

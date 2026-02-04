@@ -3,6 +3,7 @@ use crate::models::{Course, DetailCourse, Period, Semester, TopicDetail, TopicIn
 use crate::parsers;
 use reqwest::cookie::Jar;
 use reqwest::header::{HeaderMap, USER_AGENT};
+use reqwest::multipart;
 use scraper::{Html, Selector};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -151,7 +152,7 @@ impl SpotifierCoreClient {
         course_id: u64,
         topic_id: u64,
     ) -> Result<TopicDetail> {
-        let path = format!("/mhs/materi/{}/{}", course_id, topic_id);
+        let path = format!("/mhs/topik/{}/{}", course_id, topic_id);
         let html_content = self.get_html(&path).await?;
         parsers::topic_detail::parse_topic_detail_from_html(&html_content, topic_id, course_id)
     }
@@ -203,5 +204,89 @@ impl SpotifierCoreClient {
                 "No courses found to determine current period".to_string(),
             ))
         }
+    }
+
+    /// Submits a task to SPOT.
+    ///
+    /// # Arguments
+    /// * `course_id` - ID of the course
+    /// * `topic_id` - ID of the topic
+    /// * `task_id` - ID of the task
+    /// * `token` - CSRF token for submission (from Task struct)
+    /// * `content` - Text content/description of the submission
+    /// * `file_name` - Optional filename for attachment
+    /// * `file_data` - Optional file content as bytes
+    pub async fn submit_task(
+        &self,
+        course_id: u64,
+        topic_id: u64,
+        task_id: u64,
+        token: &str,
+        content: &str,
+        file_name: Option<String>,
+        file_data: Option<Vec<u8>>,
+    ) -> Result<()> {
+        let mut form = multipart::Form::new()
+            .text("_token", token.to_string())
+            .text("id_pn", course_id.to_string())
+            .text("id_pt", topic_id.to_string())
+            .text("id_tg", task_id.to_string())
+            .text("isi", content.to_string());
+
+        if let (Some(name), Some(data)) = (file_name, file_data) {
+            let part = multipart::Part::bytes(data).file_name(name);
+            form = form.part("filename", part);
+        }
+
+        let response = self
+            .client
+            .post(format!("{}/mhs/tugas_store", self.base_url))
+            .multipart(form)
+            .send()
+            .await?;
+
+        let status = response.status();
+
+        // Success usually redirects back to the topic page (302 -> 200)
+        if status.is_success() || status.is_redirection() {
+            return Ok(());
+        }
+
+        Err(ScraperError::TaskSubmissionFailed(format!(
+            "Status: {}",
+            status
+        )))
+    }
+
+    /// Deletes a task submission from SPOT.
+    ///
+    /// # Arguments
+    /// * `course_id` - ID of the course
+    /// * `topic_id` - ID of the topic
+    /// * `answer_id` - ID of the submission to delete (from Answer struct)
+    pub async fn delete_task_submission(
+        &self,
+        course_id: u64,
+        topic_id: u64,
+        answer_id: u64,
+    ) -> Result<()> {
+        let path = format!("/mhs/tugas_del/{}/{}/{}", course_id, topic_id, answer_id);
+        let response = self
+            .client
+            .get(format!("{}{}", self.base_url, path))
+            .send()
+            .await?;
+
+        let status = response.status();
+
+        // Success usually redirects back to the topic page (302 -> 200)
+        if status.is_success() || status.is_redirection() {
+            return Ok(());
+        }
+
+        Err(ScraperError::TaskDeletionFailed(format!(
+            "Status: {}",
+            status
+        )))
     }
 }
