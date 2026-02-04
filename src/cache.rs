@@ -4,14 +4,27 @@ use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::fs;
 
-/// Trait for cache storage backends.
+/// A trait for defining custom cache storage engines.
+///
+/// This allows the scraper to persist data (like course lists or session cookies)
+/// using different backends such as the local filesystem, memory, or external
+/// stores like Redis.
 #[async_trait]
 pub trait CacheBackend: Send + Sync {
-    /// Retrieve a value from the cache.
+    /// Retrieves a value from the cache by its key.
+    ///
+    /// Returns `Some(String)` if the key exists and is not expired, otherwise `None`.
     async fn get(&self, key: &str) -> Option<String>;
-    /// Store a value in the cache with a Time-To-Live (TTL).
+
+    /// Stores a value in the cache with a specific Time-To-Live (TTL).
+    ///
+    /// # Arguments
+    /// * `key` - The unique identifier for the data.
+    /// * `value` - The string content to store.
+    /// * `ttl_secs` - Duration in seconds before the data expires.
     async fn set(&self, key: &str, value: &str, ttl_secs: u64) -> Result<(), String>;
-    /// Remove a value from the cache.
+
+    /// Removes a value from the cache.
     async fn delete(&self, key: &str) -> Result<(), String>;
 }
 
@@ -21,12 +34,15 @@ struct CacheEntry {
     expires_at: u64,
 }
 
-/// Simple file-based cache backend.
+/// A default cache implementation that stores data as JSON files on the local filesystem.
+///
+/// It ensures data integrity through atomic writes (writing to a temporary file before renaming).
 pub struct FileCache {
     cache_dir: PathBuf,
 }
 
 impl FileCache {
+    /// Creates a new `FileCache` using the specified directory.
     pub fn new<P: AsRef<Path>>(cache_dir: P) -> Self {
         Self {
             cache_dir: cache_dir.as_ref().to_path_buf(),

@@ -23,6 +23,11 @@ const MODERN_USER_AGENTS: &[&str] = &[
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Safari/605.1.15",
 ];
 
+/// The core client for interacting with the SPOT API.
+///
+/// This client handles authentication, period management, course/topic retrieval,
+/// and task submissions with built-in protections like randomized delays and
+/// User-Agent rotation to simulate human behavior.
 pub struct SpotifierCoreClient {
     client: reqwest::Client,
     base_url: String,
@@ -33,10 +38,14 @@ pub struct SpotifierCoreClient {
 }
 
 impl SpotifierCoreClient {
+    /// Creates a new `SpotifierCoreClient` with default configuration.
+    ///
+    /// The default configuration includes randomized delays (1-3s) between requests.
     pub fn new() -> Self {
         Self::with_config(DelayConfig::default())
     }
 
+    /// Creates a new `SpotifierCoreClient` with a custom `DelayConfig`.
     pub fn with_config(delay_config: DelayConfig) -> Self {
         let cookie_jar = Arc::new(Jar::default());
 
@@ -63,11 +72,17 @@ impl SpotifierCoreClient {
     }
 
     /// Sets the cache backend for the client.
+    ///
+    /// This allows storing session cookies and API responses to improve performance
+    /// and avoid frequent SSO logins.
     pub fn set_cache(&mut self, cache: Arc<dyn CacheBackend>) {
         self.cache = Some(cache);
     }
 
-    /// Sets a prefix/namespace for all cache keys (useful for multi-user apps).
+    /// Sets a prefix/namespace for all cache keys.
+    ///
+    /// This is particularly useful for multi-user applications (like an API)
+    /// to isolate cache data for different users (e.g., using a student identity).
     pub fn set_cache_prefix(&mut self, prefix: &str) {
         self.cache_prefix = Some(prefix.to_string());
     }
@@ -80,6 +95,8 @@ impl SpotifierCoreClient {
     }
 
     /// Saves the current session cookies to a JSON file.
+    ///
+    /// This allows for session persistence across different runs of the application.
     pub async fn save_cookies(&self, path: &std::path::Path) -> Result<()> {
         let spot_url = "https://spot.upi.edu".parse().unwrap();
         let sso_url = "https://sso.upi.edu".parse().unwrap();
@@ -104,6 +121,9 @@ impl SpotifierCoreClient {
     }
 
     /// Loads session cookies from a JSON file.
+    ///
+    /// This populates the internal cookie jar, allowing the client to resume a session
+    /// without re-authenticating through SSO.
     pub async fn load_cookies(&self, path: &std::path::Path) -> Result<()> {
         let json = tokio::fs::read_to_string(path).await.map_err(|e| {
             ScraperError::ParsingError(format!("Failed to read cookie file: {}", e))
@@ -139,7 +159,7 @@ impl SpotifierCoreClient {
         MODERN_USER_AGENTS[rand::rng().random_range(0..MODERN_USER_AGENTS.len())]
     }
 
-    /// Waits for a random duration based on delay_config.
+    /// Waits for a random duration based on the current `DelayConfig`.
     async fn wait_random(&self) {
         if !self.delay_config.enabled {
             return;
@@ -150,7 +170,7 @@ impl SpotifierCoreClient {
         sleep(std::time::Duration::from_millis(ms)).await;
     }
 
-    /// Helper to perform a GET request with randomized delay and rotated UA.
+    /// Helper to perform a GET request with randomized delay and rotated User-Agent.
     async fn get_request(&self, url: &str) -> Result<reqwest::Response> {
         self.wait_random().await;
         let ua = self.get_random_ua();
@@ -162,7 +182,7 @@ impl SpotifierCoreClient {
             .map_err(ScraperError::from)
     }
 
-    /// Helper to perform a POST request with randomized delay and rotated UA.
+    /// Helper to perform a POST request with randomized delay and rotated User-Agent.
     async fn post_request<T: serde::Serialize + ?Sized>(
         &self,
         url: &str,
@@ -179,9 +199,14 @@ impl SpotifierCoreClient {
             .map_err(ScraperError::from)
     }
 
-    /// Logs into SPOT using a student ID (NIM) and password.
+    /// Logs into SPOT using a student ID (NIM) and password through the SSO system.
+    ///
+    /// This involves a three-step process:
+    /// 1. Fetching the SSO login page to retrieve the execution token.
+    /// 2. Posting credentials to the SSO service.
+    /// 3. Validating the final redirection back to the SPOT platform.
     pub async fn login(&self, nim: &str, password: &str) -> Result<()> {
-        // --- STEP 1: GET the login page to get the "execution" token ---
+        // Step 1: GET the login page to retrieve the "execution" token
         let response = self.get_request(SSO_LOGIN_PAGE_URL).await?;
 
         // The service URL is now part of the request URL itself
@@ -198,33 +223,28 @@ impl SpotifierCoreClient {
             .and_then(|element| element.value().attr("value"))
             .ok_or(ScraperError::TokenNotFound)?;
 
-        // --- STEP 2: POST credentials to the correct URL with all fields ---
+        // Step 2: POST credentials to the SSO service
         let mut params = HashMap::new();
         params.insert("username", nim);
         params.insert("password", password);
         params.insert("execution", execution_token);
         params.insert("_eventId", "submit");
 
-        // --- CHANGE 2: Post to the full URL including the '?service=...' part ---
         let response = self
             .post_request(login_action_url.as_str(), &params)
             .await?;
 
-        // Action-specific jitter: Add a longer delay (2-5 seconds) after successful login.
+        // Simulate human processing time after successful login
         if self.delay_config.enabled {
             let jitter_ms = rand::rng().random_range(2000..=5000);
             sleep(std::time::Duration::from_millis(jitter_ms)).await;
         }
 
-        // --- STEP 3: Verify the final redirection URL ---
+        // Step 3: Verify the final redirection to SPOT
         let final_url = response.url().clone();
         if final_url.host_str() != Some("spot.upi.edu") {
             let error_body = response.text().await.unwrap_or_default();
             std::fs::write("login_fail.html", error_body).ok();
-            println!(
-                "Login failed. Check login_fail.html for details. The final URL was: {}",
-                final_url
-            );
 
             return Err(ScraperError::AuthenticationFailed);
         }
@@ -232,6 +252,7 @@ impl SpotifierCoreClient {
         Ok(())
     }
 
+    /// Internal helper to fetch HTML content from a specific path.
     async fn get_html(&self, path: &str) -> Result<String> {
         let url = format!("{}{}", self.base_url, path);
         let response = self.get_request(&url).await?;
@@ -243,11 +264,15 @@ impl SpotifierCoreClient {
         Ok(response.text().await?)
     }
 
+    /// Fetches the basic profile information of the currently logged-in user.
     pub async fn get_user_profile(&self) -> Result<User> {
         let html_content = self.get_html("/mhs").await?;
         parsers::user::parse_user_from_html(&html_content)
     }
 
+    /// Fetches the list of all courses the user is enrolled in for the active period.
+    ///
+    /// This method is cached for 1 hour by default if a `CacheBackend` is configured.
     pub async fn get_courses(&self) -> Result<Vec<Course>> {
         let cache_key = self.get_cache_key("courses");
         if let Some(cache) = &self.cache {
@@ -263,35 +288,38 @@ impl SpotifierCoreClient {
 
         if let Some(cache) = &self.cache {
             if let Ok(json) = serde_json::to_string(&courses) {
-                let _ = cache.set(&cache_key, &json, 3600).await; // 1 hour TTL
+                let _ = cache.set(&cache_key, &json, 3600).await; // 1-hour expiration
             }
         }
 
         Ok(courses)
     }
 
+    /// Fetches full details for a specific course, including its topics.
     pub async fn get_course_detail(&self, course: &Course) -> Result<DetailCourse> {
         // The href for the detail page is already stored in the Course struct
         let html_content: String = self.get_html(&course.href).await?;
         parsers::course_detail::parse_course_detail_from_html(&html_content, course.clone())
     }
 
+    /// Fetches detailed information for a specific topic, including associated tasks.
     pub async fn get_topic_detail(&self, topic_info: &TopicInfo) -> Result<TopicDetail> {
         let href = topic_info.href.as_ref().ok_or_else(|| {
-            ScraperError::ParsingError("TopicInfo tidak memiliki href yang valid".to_string())
+            ScraperError::ParsingError("TopicInfo does not have a valid href".to_string())
         })?;
 
         let course_id = topic_info.course_id.ok_or_else(|| {
-            ScraperError::ParsingError("TopicInfo tidak memiliki course_id yang valid".to_string())
+            ScraperError::ParsingError("TopicInfo does not have a valid course_id".to_string())
         })?;
         let topic_id = topic_info.id.ok_or_else(|| {
-            ScraperError::ParsingError("TopicInfo tidak memiliki id yang valid".to_string())
+            ScraperError::ParsingError("TopicInfo does not have a valid topic_id".to_string())
         })?;
 
         let html_content = self.get_html(href).await?;
         parsers::topic_detail::parse_topic_detail_from_html(&html_content, topic_id, course_id)
     }
 
+    /// Convenience method to get course details using its unique ID.
     pub async fn get_course_detail_by_id(&self, course_id: u64) -> Result<DetailCourse> {
         let courses = self.get_courses().await?;
 
@@ -305,6 +333,7 @@ impl SpotifierCoreClient {
         self.get_course_detail(&course).await
     }
 
+    /// Convenience method to get topic details using course and topic IDs.
     pub async fn get_topic_detail_by_id(
         &self,
         course_id: u64,
@@ -315,65 +344,81 @@ impl SpotifierCoreClient {
         parsers::topic_detail::parse_topic_detail_from_html(&html_content, topic_id, course_id)
     }
 
+    /// Changes the active academic period/semester for the current session.
     pub async fn change_period(&self, year: u16, semester: Semester) -> Result<()> {
         let period = Period::new(year, semester);
         let path = format!("/adm/semester/{}", period.format());
 
         let response = self
-            .client
-            .get(format!("{}{}", self.base_url, path))
-            .send()
+            .get_request(&format!("{}{}", self.base_url, path))
             .await?;
 
         let status = response.status();
 
-        // Success: 200 OK or 302 redirect to /adm
+        // Success usually results in a 200 OK or a 302 redirect to /adm
         if status.is_success() || status.is_redirection() {
-            // Check if we actually redirected to /adm (success indicator)
             let final_url = response.url();
             if final_url.path() == "/adm" || final_url.path().starts_with("/adm") {
                 return Ok(());
             }
         }
 
-        // 500 error means invalid period format
+        // A 500 error typically indicates an invalid or unsupported period format
         if status.as_u16() == 500 {
             return Err(ScraperError::InvalidPeriod(format!(
-                "Period {} is not valid or unavailable",
+                "Period {} is not valid or unavailable in the system",
                 period.format()
             )));
         }
 
-        // Any other error
         Err(ScraperError::ParsingError(format!(
-            "Failed to change period, status: {}",
+            "Unexpected response while changing period. Status: {}",
             status
         )))
     }
 
+    /// Retrieves the raw string representation of the current academic period.
+    ///
+    /// Example: "2025/2026 - Ganjil"
     pub async fn get_current_period_info(&self) -> Result<String> {
         let courses = self.get_courses().await?;
 
         if let Some(first_course) = courses.first() {
-            // Return raw string: "2025/2026 - Genap" or "2025/2026 - Ganjil"
             Ok(first_course.academic_year.clone())
         } else {
             Err(ScraperError::ParsingError(
-                "No courses found to determine current period".to_string(),
+                "No courses found to determine the current academic period".to_string(),
             ))
         }
     }
 
-    /// Submits a task to SPOT.
+    /// Internal helper to perform a POST request with a multipart form (used for file uploads).
+    async fn multipart_request(
+        &self,
+        url: &str,
+        form: multipart::Form,
+    ) -> Result<reqwest::Response> {
+        self.wait_random().await;
+        let ua = self.get_random_ua();
+        self.client
+            .post(url)
+            .header(USER_AGENT, ua)
+            .multipart(form)
+            .send()
+            .await
+            .map_err(ScraperError::from)
+    }
+
+    /// Submits a task to the SPOT platform.
     ///
     /// # Arguments
-    /// * `course_id` - ID of the course
-    /// * `topic_id` - ID of the topic
-    /// * `task_id` - ID of the task
-    /// * `token` - CSRF token for submission (from Task struct)
-    /// * `content` - Text content/description of the submission
-    /// * `file_name` - Optional filename for attachment
-    /// * `file_data` - Optional file content as bytes
+    /// * `course_id` - The unique identifier for the course.
+    /// * `topic_id` - The unique identifier for the topic.
+    /// * `task_id` - The unique identifier for the specific task.
+    /// * `token` - The CSRF token required for the submission (extracted from the topic detail).
+    /// * `content` - The text content or description for the submission.
+    /// * `file_name` - Optional name for an attached file.
+    /// * `file_data` - Optional bytes for the attached file.
     pub async fn submit_task(
         &self,
         course_id: u64,
@@ -397,31 +442,28 @@ impl SpotifierCoreClient {
         }
 
         let response = self
-            .client
-            .post(format!("{}/mhs/tugas_store", self.base_url))
-            .multipart(form)
-            .send()
+            .multipart_request(&format!("{}/mhs/tugas_store", self.base_url), form)
             .await?;
 
         let status = response.status();
 
-        // Success usually redirects back to the topic page (302 -> 200)
+        // Successful submission usually results in a redirect back to the topic page
         if status.is_success() || status.is_redirection() {
             return Ok(());
         }
 
         Err(ScraperError::TaskSubmissionFailed(format!(
-            "Status: {}",
+            "Server returned error status: {}",
             status
         )))
     }
 
-    /// Deletes a task submission from SPOT.
+    /// Deletes an existing task submission from the SPOT platform.
     ///
     /// # Arguments
-    /// * `course_id` - ID of the course
-    /// * `topic_id` - ID of the topic
-    /// * `answer_id` - ID of the submission to delete (from Answer struct)
+    /// * `course_id` - The unique identifier for the course.
+    /// * `topic_id` - The unique identifier for the topic.
+    /// * `answer_id` - The ID of the submission to delete (found in the `Task`'s `answer` field).
     pub async fn delete_task_submission(
         &self,
         course_id: u64,
@@ -430,20 +472,18 @@ impl SpotifierCoreClient {
     ) -> Result<()> {
         let path = format!("/mhs/tugas_del/{}/{}/{}", course_id, topic_id, answer_id);
         let response = self
-            .client
-            .get(format!("{}{}", self.base_url, path))
-            .send()
+            .get_request(&format!("{}{}", self.base_url, path))
             .await?;
 
         let status = response.status();
 
-        // Success usually redirects back to the topic page (302 -> 200)
+        // Successful deletion usually results in a redirect back to the topic page
         if status.is_success() || status.is_redirection() {
             return Ok(());
         }
 
         Err(ScraperError::TaskDeletionFailed(format!(
-            "Status: {}",
+            "Server returned error status: {}",
             status
         )))
     }
