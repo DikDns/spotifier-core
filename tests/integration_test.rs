@@ -1,7 +1,7 @@
 // tests/integration_test.rs
 
 use dotenvy::from_path;
-use spot_scraper::{Result, SpotClient};
+use spotifier_core::{Result, SpotifierCoreClient};
 use std::env;
 use std::fs::File;
 use std::io::Write;
@@ -32,7 +32,7 @@ async fn test_full_login_and_scrape_flow() -> Result<()> {
 
     writeln!(log_file, "--- Starting Full Scraper Integration Test ---").unwrap();
 
-    let client = SpotClient::new();
+    let client = SpotifierCoreClient::new();
 
     // --- STEP 1: Login ---
     writeln!(log_file, "\n[1/5] Attempting login with NIM: {}...", nim).unwrap();

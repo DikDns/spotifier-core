@@ -10,12 +10,12 @@ use std::sync::Arc;
 const SSO_LOGIN_PAGE_URL: &str =
     "https://sso.upi.edu/cas/login?service=https://spot.upi.edu/beranda";
 
-pub struct SpotClient {
+pub struct SpotifierCoreClient {
     client: reqwest::Client,
     base_url: String,
 }
 
-impl SpotClient {
+impl SpotifierCoreClient {
     pub fn new() -> Self {
         let cookie_jar = Arc::new(Jar::default());
 

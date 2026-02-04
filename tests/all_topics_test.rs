@@ -1,7 +1,7 @@
 // tests/all_topics_test.rs
 
 use dotenvy::from_path;
-use spot_scraper::{Result, SpotClient};
+use spotifier_core::{Result, SpotifierCoreClient};
 use std::env;
 use std::fs::File;
 use std::io::Write;
@@ -37,7 +37,7 @@ async fn test_scrape_all_topics() -> Result<()> {
     writeln!(log_file, "--- Memulai Full Topic Scraping Test ---").unwrap();
     println!("--- Memulai Full Topic Scraping Test ---");
 
-    let client = SpotClient::new();
+    let client = SpotifierCoreClient::new();
 
     // --- Langkah 1: Login ---
     writeln!(log_file, "\n[1/4] Mencoba login...").unwrap();
